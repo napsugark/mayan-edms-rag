@@ -1,0 +1,796 @@
+# ============================================================
+# docker-compose.yml — Unified Mayan EDMS + Hybrid RAG Stack
+#
+# MAYAN EDMS SERVICES:
+#   app                – Mayan EDMS (all-in-one mode)
+#   postgresql         – PostgreSQL for Mayan
+#   rabbitmq           – RabbitMQ message broker
+#   redis              – Redis for Mayan
+#   elasticsearch      – Elasticsearch (optional, profile: elasticsearch)
+#   frontend           – Extra Gunicorn frontend (profile: multi_container)
+#   worker_a..e        – Celery workers (profile: multi_container)
+#   celery_beat        – Celery beat scheduler (profile: multi_container)
+#   setup_or_upgrade   – Initial setup / upgrade (profile: multi_container)
+#   traefik            – Reverse proxy (profile: traefik)
+#   cabinet_mirror     – Cabinet FUSE mirror (profile: cabinet_mirror)
+#   index_mirror       – Index FUSE mirror (profile: index_mirror)
+#
+# RAG SERVICES:
+#   rag                – FastAPI RAG server
+#   qdrant             – Qdrant vector database
+#   ollama             – Local LLM server (profile: ollama)
+#
+# LANGFUSE OBSERVABILITY:
+#   langfuse-web       – Langfuse UI & API (port 3111)
+#   langfuse-worker    – Langfuse background worker
+#   langfuse-pg        – PostgreSQL for Langfuse
+#   langfuse-redis     – Redis for Langfuse
+#   langfuse-ch        – ClickHouse for Langfuse
+#   langfuse-minio     – MinIO (S3) for Langfuse
+#
+# This file lives at the root of the workspace that contains
+# both mayan-edms-new/ and hybrid_rag_qa/ sibling directories.
+#
+# Usage:
+#   # Copy the env template and fill in secrets
+#   cp .env.example .env
+#
+#   # Start the full stack (default profiles)
+#   docker compose up -d --build
+#
+#   # Or with explicit profiles
+#   docker compose --profile all_in_one --profile postgresql \
+#     --profile rabbitmq --profile redis up -d --build
+#
+#   # Include Ollama for local LLM
+#   docker compose --profile all_in_one --profile postgresql \
+#     --profile rabbitmq --profile redis --profile ollama up -d --build
+# ============================================================
+
+
+# ============================================================
+# YAML Anchors — Mayan EDMS shared configuration
+# ============================================================
+
+x-mayan-depends_on-basic:
+  &mayan-depends_on-basic
+  depends_on:
+    postgresql:
+      condition: service_healthy
+      required: false
+    rabbitmq:
+      condition: service_healthy
+      required: false
+    redis:
+      condition: service_healthy
+      required: false
+
+x-mayan-depends_on-advanced:
+  &mayan-depends_on-advanced
+  depends_on:
+    postgresql:
+      condition: service_healthy
+      required: false
+    rabbitmq:
+      condition: service_healthy
+      required: false
+    redis:
+      condition: service_healthy
+      required: false
+    setup_or_upgrade:
+      condition: service_completed_successfully
+      required: false
+
+x-mayan-container:
+  &mayan-container
+  <<: [*mayan-depends_on-basic]
+  env_file:
+    - .env
+    - path: .env-local
+      required: false
+  environment:
+    MAYAN_CELERY_BROKER_URL: amqp://${MAYAN_RABBITMQ_USER:-mayan}:${MAYAN_RABBITMQ_PASSWORD:-mayanrabbitpass}@${MAYAN_DOCKER_RABBITMQ_HOSTNAME:-rabbitmq}:${MAYAN_DOCKER_RABBITMQ_PORT:-5672}/${MAYAN_RABBITMQ_VHOST:-mayan}
+    MAYAN_CELERY_RESULT_BACKEND: redis://:${MAYAN_REDIS_PASSWORD:-mayanredispassword}@${MAYAN_DOCKER_REDIS_HOSTNAME:-redis}:${MAYAN_DOCKER_REDIS_PORT:-6379}/${MAYAN_REDIS_RESULT_DATABASE:-1}
+    MAYAN_DATABASES: "{'default':{'ENGINE':'django.db.backends.postgresql','NAME':'${MAYAN_DATABASE_NAME:-mayan}','PASSWORD':'${MAYAN_DATABASE_PASSWORD:-mayandbpass}','USER':'${MAYAN_DATABASE_USER:-mayan}','HOST':'${MAYAN_DATABASE_HOST:-postgresql}','PORT':${MAYAN_DATABASE_PORT:-},'CONN_MAX_AGE':${MAYAN_DATABASE_CONN_MAX_AGE:-0},${MAYAN_DATABASE_EXTRA_OPTIONS:-}}}"
+    MAYAN_LOCK_MANAGER_BACKEND: mayan.apps.lock_manager.backends.redis_lock.RedisLock
+    MAYAN_LOCK_MANAGER_BACKEND_ARGUMENTS: "{'redis_url':'redis://:${MAYAN_REDIS_PASSWORD:-mayanredispassword}@${MAYAN_DOCKER_REDIS_HOSTNAME:-redis}:${MAYAN_DOCKER_REDIS_PORT:-6379}/${MAYAN_REDIS_LOCK_MANAGER_DATABASE:-2}'}"
+    # Uncomment below to enable Elasticsearch search backend
+    # MAYAN_SEARCH_BACKEND: mayan.apps.dynamic_search.backends.elasticsearch.ElasticsearchSearchBackend
+    # MAYAN_SEARCH_BACKEND_ARGUMENTS: "{client_kwargs: {basic_auth: [elastic, '${MAYAN_ELASTICSEARCH_PASSWORD:-mayanespassword}'], hosts: ['http://elasticsearch:9200'], verify_certs: false}, indices_namespace: mayan, search_page_size: 100, point_in_time_keep_alive: 5m}"
+  image: ${MAYAN_DOCKER_IMAGE_NAME:-mayanedms/mayanedms}:${MAYAN_DOCKER_IMAGE_TAG:-s4.10}
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "100m"
+      max-file: "3"
+      mode: "non-blocking"
+  networks:
+    - mayan
+  restart: unless-stopped
+  volumes:
+    - ${MAYAN_APP_VOLUME:-app}:/var/lib/mayan
+    # RAG Integration app — mount source code and settings into container
+    - ./mayan-edms-new/mayan/apps/rag_integration:/opt/mayan-edms/lib/python3.11/site-packages/mayan/apps/rag_integration
+    - ./mayan-edms-new/mayan/settings/base.py:/opt/mayan-edms/lib/python3.11/site-packages/mayan/settings/base.py
+    # Optional: watch folder for document ingestion (set MAYAN_WATCH_FOLDER in .env)
+    # - ${MAYAN_WATCH_FOLDER:-./watch_folder}:/watch_folder
+
+x-mayan-frontend-ports:
+  &mayan-frontend-ports
+  # Disable ports if using Traefik. Set to an empty list [].
+  ports:
+    - "${MAYAN_FRONTEND_HTTP_PORT:-80}:8000"
+    # []
+
+x-mayan-healthcheck:
+  &mayan-healthcheck
+  healthcheck:
+    test: ["CMD-SHELL", "/opt/mayan-edms/bin/python -c \"import sys,urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5); sys.exit(0 if r.status<400 else 1)\""]
+    interval: 30s
+    timeout: 5s
+    retries: 10
+    start_period: 30s
+
+x-mayan-traefik-labels:
+  &mayan-traefik-labels
+  labels:
+    - "traefik.enable=${MAYAN_TRAEFIK_FRONTEND_ENABLE:-false}"
+    - "traefik.http.middlewares.mayan_frontend_http_redirect.redirectscheme.scheme=https"
+    - "traefik.http.middlewares.mayan_frontend_http_redirect.redirectscheme.permanent=false"
+    - "traefik.http.routers.mayan_frontend_http.entrypoints=http"
+    - "traefik.http.routers.mayan_frontend_http.middlewares=mayan_frontend_http_redirect"
+    - "traefik.http.routers.mayan_frontend_http.rule=Host(`${MAYAN_TRAEFIK_EXTERNAL_DOMAIN}`)"
+    - "traefik.http.routers.mayan_frontend_https.entrypoints=https"
+    - "traefik.http.routers.mayan_frontend_https.rule=Host(`${MAYAN_TRAEFIK_EXTERNAL_DOMAIN}`)"
+    - "traefik.http.routers.mayan_frontend_https.service=mayan_frontend_http"
+    - "traefik.http.routers.mayan_frontend_https.tls=true"
+    - "traefik.http.routers.mayan_frontend_https.tls.certresolver=letsencrypt"
+    - "traefik.http.services.mayan_frontend_http.loadbalancer.server.port=8000"
+
+
+# ============================================================
+# Networks
+# ============================================================
+networks:
+  mayan:
+    driver: bridge
+    # Change to true when using Traefik for increased security.
+    internal: false
+  traefik: {}
+
+
+# ============================================================
+# Services
+# ============================================================
+services:
+
+  # ==========================================================
+  # MAYAN EDMS
+  # ==========================================================
+
+  # ---- Mayan All-in-One ----
+  app:
+    <<: [*mayan-container, *mayan-healthcheck, *mayan-traefik-labels, *mayan-frontend-ports]
+    profiles:
+      - all_in_one
+
+  # ---- Mayan PostgreSQL ----
+  postgresql:
+    command:
+      - "postgres"
+      - "-c"
+      - "default_statistics_target=200"
+      - "-c"
+      - "maintenance_work_mem=128MB"
+      - "-c"
+      - "max_connections=${MAYAN_DOCKER_POSTGRESQL_MAX_CONNECTIONS:-150}"
+      - "-c"
+      - "shared_buffers=512MB"
+      - "-c"
+      - "work_mem=32MB"
+    environment:
+      POSTGRES_DB: ${MAYAN_DATABASE_NAME:-mayan}
+      POSTGRES_PASSWORD: ${MAYAN_DATABASE_PASSWORD:-mayandbpass}
+      POSTGRES_USER: ${MAYAN_DATABASE_USER:-mayan}
+    healthcheck:
+      test: ["CMD", "pg_isready", "--dbname", "${MAYAN_DATABASE_NAME:-mayan}", "--username", "${MAYAN_DATABASE_USER:-mayan}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    image: ${MAYAN_DOCKER_POSTGRESQL_IMAGE:-postgres}:${MAYAN_DOCKER_POSTGRESQL_TAG:-15.14}
+    networks:
+      - mayan
+    # Enable to allow external access to the database.
+    # ports:
+    #  - "5432:5432"
+    profiles:
+      - postgresql
+    restart: unless-stopped
+    shm_size: 128m
+    volumes:
+      - ${MAYAN_POSTGRESQL_VOLUME:-postgres}:/var/lib/postgresql/data
+      - ${MAYAN_POSTGRESQL_VOLUME_INITDB:-postgres-initdb}:/docker-entrypoint-initdb.d/
+
+  # ---- Mayan PostgreSQL Backup ----
+  postgresql-backup:
+    command:
+      - /bin/sh
+      - -c
+      - pg_dump -F p | gzip > /backups/$(date +%Y-%m-%d_%H-%M).sql.gz
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      PGDATABASE: ${MAYAN_DATABASE_NAME:-mayan}
+      PGHOST: ${MAYAN_DATABASE_HOST:-postgresql}
+      PGPASSWORD: ${MAYAN_DATABASE_PASSWORD:-mayandbpass}
+      PGUSER: ${MAYAN_DATABASE_USER:-mayan}
+    image: ${MAYAN_DOCKER_POSTGRESQL_IMAGE:-postgres}:${MAYAN_DOCKER_POSTGRESQL_TAG:-15.14}
+    networks:
+      - mayan
+    profiles:
+      - postgresql-backup
+    restart: no
+    volumes:
+      - ${MAYAN_POSTGRESQL_BACKUPS_VOLUME:-postgres-backups}:/backups
+
+  # ---- RabbitMQ ----
+  rabbitmq:
+    environment:
+      RABBITMQ_DEFAULT_USER: ${MAYAN_RABBITMQ_USER:-mayan}
+      RABBITMQ_DEFAULT_PASS: ${MAYAN_RABBITMQ_PASSWORD:-mayanrabbitpass}
+      RABBITMQ_DEFAULT_VHOST: ${MAYAN_RABBITMQ_VHOST:-mayan}
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: ${MAYAN_RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS:--rabbit consumer_timeout ${MAYAN_RABBITMQ_CONSUMER_TIMEOUT:-1800000}}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+      start_period: 20s
+    hostname: ${MAYAN_DOCKER_RABBITMQ_HOSTNAME:-rabbitmq}
+    image: ${MAYAN_DOCKER_RABBITMQ_IMAGE:-rabbitmq}:${MAYAN_DOCKER_RABBITMQ_TAG:-4.1.4-management}
+    labels:
+      - "traefik.enable=${MAYAN_TRAEFIK_RABBITMQ_ENABLE:-false}"
+      - "traefik.http.routers.rabbitmq_admin_http.entrypoints=rabbitmq_admin_http"
+      - "traefik.http.routers.rabbitmq_admin_http.rule=Host(`${MAYAN_TRAEFIK_EXTERNAL_DOMAIN}`)"
+      - "traefik.http.routers.rabbitmq_admin_http.service=rabbitmq_admin_http"
+      - "traefik.http.routers.rabbitmq_admin_http.tls=true"
+      - "traefik.http.routers.rabbitmq_admin_http.tls.certresolver=letsencrypt"
+      - "traefik.http.services.rabbitmq_admin_http.loadbalancer.server.port=15672"
+    networks:
+      - mayan
+    # Enable the first port to allow access to the administration interface.
+    # Enable the second port to allow external access to the data.
+    # ports:
+    #   - "${MAYAN_RABBITMQ_ADMIN_PORT:-15672}:15672"
+    #   - "5672:5672"
+    profiles:
+      - rabbitmq
+    restart: unless-stopped
+    volumes:
+      - ${MAYAN_RABBITMQ_VOLUME:-rabbitmq}:/var/lib/rabbitmq
+
+  # ---- Mayan Redis ----
+  redis:
+    command:
+      - redis-server
+      - --appendonly
+      - "no"
+      - --databases
+      - "3"
+      - --maxmemory
+      - "100mb"
+      - --maxclients
+      - "500"
+      - --maxmemory-policy
+      - "allkeys-lru"
+      - --save
+      - ""
+      - --tcp-backlog
+      - "256"
+      - --requirepass
+      - "${MAYAN_REDIS_PASSWORD:-mayanredispassword}"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${MAYAN_REDIS_PASSWORD:-mayanredispassword}", "ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    image: ${MAYAN_DOCKER_REDIS_IMAGE:-redis}:${MAYAN_DOCKER_REDIS_TAG:-7.4.5}
+    networks:
+      - mayan
+    profiles:
+      - redis
+    restart: unless-stopped
+    volumes:
+      - ${MAYAN_REDIS_VOLUME:-redis}:/data
+
+  # ---- Elasticsearch (optional) ----
+  elasticsearch:
+    environment:
+      - bootstrap.memory_lock=true
+      - discovery.type=single-node
+      - http.max_content_length=400mb
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - ELASTIC_PASSWORD=${MAYAN_ELASTICSEARCH_PASSWORD:-mayanespassword}
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--user", "elastic:${MAYAN_ELASTICSEARCH_PASSWORD:-mayanespassword}", "http://localhost:9200/_cluster/health?wait_for_status=green || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    image: ${MAYAN_DOCKER_ELASTICSEARCH_IMAGE:-elasticsearch}:${MAYAN_DOCKER_ELASTICSEARCH_TAG:-9.1.3}
+    networks:
+      - mayan
+    # ports:
+    #  - "9200:9200"
+    profiles:
+      - elasticsearch
+    restart: unless-stopped
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - ${MAYAN_ELASTICSEARCH_VOLUME:-elasticsearch}:/usr/share/elasticsearch/data
+
+  # ---- Mayan Frontend (multi_container mode) ----
+  frontend:
+    <<: [*mayan-depends_on-advanced, *mayan-container, *mayan-healthcheck, *mayan-traefik-labels, *mayan-frontend-ports]
+    command:
+      - run_frontend
+    profiles:
+      - extra_frontend
+      - multi_container
+
+  # ---- Cabinet FUSE Mirror ----
+  cabinet_mirror:
+    <<: [*mayan-depends_on-advanced, *mayan-container]
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - "/dev/fuse:/dev/fuse"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - 'mkdir --parents /mnt/cabinet-${MAYAN_MIRROR_CABINET_NAME} && chown mayan:mayan /mnt/cabinet-${MAYAN_MIRROR_CABINET_NAME} && /usr/local/bin/entrypoint.sh run_command "mirroring_mount_cabinet --allow-other ${MAYAN_MIRROR_CABINET_NAME} /mnt/cabinet-${MAYAN_MIRROR_CABINET_NAME}"'
+    profiles:
+      - cabinet_mirror
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - ${MAYAN_APP_VOLUME:-app}:/var/lib/mayan
+      - type: bind
+        source: /mnt/mayan_cabinets/${MAYAN_MIRROR_CABINET_NAME}
+        target: /mnt/cabinet-${MAYAN_MIRROR_CABINET_NAME}
+        bind:
+          propagation: shared
+
+  # ---- Index FUSE Mirror ----
+  index_mirror:
+    <<: [*mayan-depends_on-advanced, *mayan-container]
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - "/dev/fuse:/dev/fuse"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - 'mkdir --parents /mnt/index-${MAYAN_MIRROR_INDEX_NAME} && chown mayan:mayan /mnt/index-${MAYAN_MIRROR_INDEX_NAME} && /usr/local/bin/entrypoint.sh run_command "mirroring_mount_index --allow-other ${MAYAN_MIRROR_INDEX_NAME} /mnt/index-${MAYAN_MIRROR_INDEX_NAME}"'
+    profiles:
+      - index_mirror
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - ${MAYAN_APP_VOLUME:-app}:/var/lib/mayan
+      - type: bind
+        source: /mnt/mayan_indexes/${MAYAN_MIRROR_INDEX_NAME}
+        target: /mnt/index-${MAYAN_MIRROR_INDEX_NAME}
+        bind:
+          propagation: shared
+
+  # ---- Celery Workers (multi_container mode) ----
+  worker_a:
+    <<: [*mayan-depends_on-advanced, *mayan-container]
+    command:
+      - run_worker
+      - worker_a
+      - "--prefetch-multiplier=1"
+    profiles:
+      - extra_worker_a
+      - multi_container
+
+  worker_b:
+    <<: [*mayan-depends_on-advanced, *mayan-container]
+    command:
+      - run_worker
+      - worker_b
+      - "--prefetch-multiplier=1"
+    profiles:
+      - extra_worker_b
+      - multi_container
+
+  worker_c:
+    <<: [*mayan-depends_on-advanced, *mayan-container]
+    command:
+      - run_worker
+      - worker_c
+      - "--prefetch-multiplier=1"
+    profiles:
+      - extra_worker_c
+      - multi_container
+
+  worker_d:
+    <<: [*mayan-depends_on-advanced, *mayan-container]
+    command:
+      - run_worker
+      - worker_d
+      - "--concurrency=1 --prefetch-multiplier=1"
+    profiles:
+      - extra_worker_d
+      - multi_container
+
+  worker_e:
+    <<: [*mayan-depends_on-advanced, *mayan-container]
+    command:
+      - run_worker
+      - worker_e
+      - "--prefetch-multiplier=1"
+    profiles:
+      - extra_worker_e
+      - multi_container
+
+  worker_custom_queue:
+    <<: [*mayan-depends_on-advanced, *mayan-container]
+    command:
+      - /bin/sh
+      - -c
+      - 'MAYAN_QUEUE_LIST=${MAYAN_WORKER_CUSTOM_QUEUE_LIST} /usr/local/bin/run_worker.sh --prefetch-multiplier=1'
+    profiles:
+      - extra_worker_custom
+
+  # ---- Celery Beat ----
+  celery_beat:
+    <<: [*mayan-depends_on-advanced, *mayan-container]
+    command:
+      - run_celery
+      - "beat --pidfile= --loglevel=ERROR"
+    profiles:
+      - extra_celery_beat
+      - multi_container
+
+  # ---- Setup / Upgrade ----
+  setup_or_upgrade:
+    <<: *mayan-container
+    command:
+      - run_initial_setup_or_perform_upgrade
+    profiles:
+      - extra_setup_or_upgrade
+      - multi_container
+    restart: "no"
+
+  # ---- Traefik Reverse Proxy ----
+  traefik:
+    container_name: "traefik"
+    command:
+      # - "--log.level=DEBUG"
+      - "--api.dashboard=true"
+      - "--api.insecure=${MAYAN_TRAEFIK_API_INSECURE:-false}"
+      - "--certificatesresolvers.letsencrypt.acme.caserver=${MAYAN_TRAEFIK_LETS_ENCRYPT_SERVER:-https://acme-staging-v02.api.letsencrypt.org/directory}"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge=${MAYAN_TRAEFIK_LETS_ENCRYPT_DNS_CHALLENGE:-false}"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=${MAYAN_TRAEFIK_LETS_ENCRYPT_DNS_CHALLENGE_PROVIDER}"
+      - "--certificatesresolvers.letsencrypt.acme.email=${MAYAN_TRAEFIK_LETS_ENCRYPT_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/traefik-certificates-letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=${MAYAN_TRAEFIK_LETS_ENCRYPT_TLS_CHALLENGE:-false}"
+      - "--entrypoints.http.address=:80"
+      - "--entrypoints.https.address=:443"
+      - "--entrypoints.rabbitmq_admin_http.address=:15672"
+      - "--entrypoints.traefik_dashboard_http.address=:8080"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+    # environment:
+    #   - Add DNS provider variables (https://doc.traefik.io/traefik/https/acme/#providers)
+    image: ${MAYAN_DOCKER_TRAEFIK_IMAGE:-traefik}:${MAYAN_DOCKER_TRAEFIK_TAG:-v2.11.29}
+    labels:
+      - "traefik.enable=${MAYAN_TRAEFIK_DASHBOARD_ENABLE:-false}"
+      - "traefik.http.middlewares.basic-auth-global.basicauth.users=${MAYAN_TRAEFIK_DASHBOARD_AUTHENTICATION}"
+      - "traefik.http.routers.traefik_https.entrypoints=traefik_dashboard_http"
+      - "traefik.http.routers.traefik_https.middlewares=basic-auth-global"
+      - "traefik.http.routers.traefik_https.rule=Host(`${MAYAN_TRAEFIK_EXTERNAL_DOMAIN}`)"
+      - "traefik.http.routers.traefik_https.service=api@internal"
+      - "traefik.http.routers.traefik_https.tls=true"
+      - "traefik.http.routers.traefik_https.tls.certresolver=letsencrypt"
+    networks:
+      - mayan
+      - traefik
+    ports:
+      - "${MAYAN_RABBITMQ_ADMIN_HTTP_PORT:-15672}:15672"
+      - "${MAYAN_TRAEFIK_DASHBOARD_HTTP_PORT:-8080}:8080"
+      - "${MAYAN_TRAEFIK_HTTP_PORT:-80}:80"
+      - "${MAYAN_TRAEFIK_HTTPS_PORT:-443}:443"
+    profiles:
+      - traefik
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${MAYAN_TRAEFIK_LETSENCRYPT_VOLUME:-traefik-certificates-letsencrypt}:/traefik-certificates-letsencrypt
+
+
+  # ==========================================================
+  # RAG — FastAPI Retrieval-Augmented Generation Server
+  # ==========================================================
+
+  rag:
+    build:
+      context: ./hybrid_rag_qa
+      dockerfile: docker/Dockerfile
+    container_name: rag
+    env_file: .env
+    environment:
+      - HF_HUB_DISABLE_TELEMETRY=1
+    ports:
+      - "8001:8000"
+    volumes:
+      - model-cache:/root/.cache
+      - rag-logs:/app/logs
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      langfuse-web:
+        condition: service_healthy
+    networks:
+      - mayan
+    restart: unless-stopped
+
+
+  # ==========================================================
+  # QDRANT — Vector Database
+  # ==========================================================
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/6333'"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    networks:
+      - mayan
+    restart: unless-stopped
+
+
+  # ==========================================================
+  # OLLAMA — Local LLM Server (optional)
+  # Only needed when MODEL_TO_USE=OLLAMA
+  # Enable with: --profile ollama
+  # ==========================================================
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+      - ./hybrid_rag_qa/docker/ollama-entrypoint.sh:/ollama-entrypoint.sh:ro
+    entrypoint: ["/bin/bash", "/ollama-entrypoint.sh"]
+    environment:
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1:8b}
+    # ---- GPU passthrough (uncomment for NVIDIA GPU) ----
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    profiles:
+      - ollama
+    networks:
+      - mayan
+    restart: unless-stopped
+
+
+  # ==========================================================
+  # LANGFUSE — Observability & Tracing
+  # ==========================================================
+
+  # ---- Langfuse Web UI (port 3111) ----
+  langfuse-web:
+    image: docker.io/langfuse/langfuse:3
+    container_name: rag-langfuse-web
+    restart: always
+    depends_on: &langfuse-deps
+      langfuse-pg:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      langfuse-ch:
+        condition: service_healthy
+      langfuse-minio:
+        condition: service_healthy
+    ports:
+      - "3111:3000"
+    environment: &langfuse-env
+      HOSTNAME: "0.0.0.0"
+      NEXTAUTH_URL: http://localhost:3111
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-changeme-nextauth-secret}
+      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-pg:5432/langfuse
+      SALT: ${LANGFUSE_SALT:-changeme-salt-value}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "true"
+      # ClickHouse
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-ch:9000
+      CLICKHOUSE_URL: http://langfuse-ch:8123
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CH_PASSWORD:-clickhouse}
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      # MinIO (S3)
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+      LANGFUSE_S3_BATCH_EXPORT_ENABLED: "false"
+      # Redis
+      REDIS_HOST: langfuse-redis
+      REDIS_PORT: "6379"
+      REDIS_AUTH: ${LANGFUSE_REDIS_PASSWORD:-langfuse-redis-secret}
+      REDIS_TLS_ENABLED: "false"
+      # Auto-initialize org, project, user, and API keys on first boot
+      LANGFUSE_INIT_ORG_ID: rag-org
+      LANGFUSE_INIT_ORG_NAME: RAG Organization
+      LANGFUSE_INIT_PROJECT_ID: rag-project
+      LANGFUSE_INIT_PROJECT_NAME: Hybrid RAG
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-local-dev-public}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-local-dev-secret}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_EMAIL:-admin@local.dev}
+      LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER:-Admin}
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_PASSWORD:-admin1234}
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/public/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    networks:
+      - mayan
+
+  # ---- Langfuse Worker ----
+  langfuse-worker:
+    image: docker.io/langfuse/langfuse-worker:3
+    container_name: rag-langfuse-worker
+    restart: always
+    depends_on: *langfuse-deps
+    environment:
+      <<: *langfuse-env
+    networks:
+      - mayan
+
+  # ---- PostgreSQL for Langfuse ----
+  langfuse-pg:
+    image: docker.io/postgres:17
+    container_name: rag-langfuse-pg
+    restart: always
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
+      POSTGRES_DB: langfuse
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - langfuse-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    networks:
+      - mayan
+
+  # ---- Redis for Langfuse ----
+  langfuse-redis:
+    image: docker.io/redis:7
+    container_name: rag-langfuse-redis
+    restart: always
+    command: >-
+      --requirepass ${LANGFUSE_REDIS_PASSWORD:-langfuse-redis-secret}
+      --maxmemory-policy noeviction
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+    networks:
+      - mayan
+
+  # ---- ClickHouse for Langfuse ----
+  langfuse-ch:
+    image: docker.io/clickhouse/clickhouse-server
+    container_name: rag-langfuse-ch
+    restart: always
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CH_PASSWORD:-clickhouse}
+    volumes:
+      - langfuse-ch-data:/var/lib/clickhouse
+      - langfuse-ch-logs:/var/log/clickhouse-server
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 1s
+    networks:
+      - mayan
+
+  # ---- MinIO (S3) for Langfuse ----
+  langfuse-minio:
+    image: cgr.dev/chainguard/minio
+    container_name: rag-langfuse-minio
+    restart: always
+    entrypoint: sh
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
+    volumes:
+      - langfuse-minio-data:/data
+    ports:
+      - "9190:9000"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 1s
+      timeout: 5s
+      retries: 5
+      start_period: 1s
+    networks:
+      - mayan
+
+
+# ============================================================
+# Volumes — persist data across container restarts
+# ============================================================
+volumes:
+  # Mayan EDMS
+  app:
+  elasticsearch:
+  postgres:
+  postgres-backups:
+  postgres-initdb:
+  mountindex:
+  rabbitmq:
+  redis:
+  traefik-certificates-letsencrypt:
+  # RAG
+  qdrant-data:
+  model-cache:
+  ollama-data:
+  rag-logs:
+  # Langfuse
+  langfuse-pg-data:
+  langfuse-ch-data:
+  langfuse-ch-logs:
+  langfuse-minio-data:
