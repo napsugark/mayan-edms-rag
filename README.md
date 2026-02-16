@@ -125,9 +125,12 @@ All containers are managed by a single `docker-compose.yml` at the project root.
 ### Steps
 
 ```bash
-# 1. Clone the repository
-git clone <repo-url>
+# 1. Clone the repository (includes the Mayan EDMS submodule)
+git clone --recurse-submodules <repo-url>
 cd mayan-edms-rag
+
+# If you already cloned without --recurse-submodules:
+# git submodule update --init --recursive
 
 # 2. Create your .env from the example
 cp .env.example .env
