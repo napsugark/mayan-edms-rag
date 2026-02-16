@@ -25,35 +25,7 @@ The Mayan EDMS code in `mayan-edms-new/` is a [fork of the official Mayan EDMS r
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────┐
-│                    Mayan EDMS                       │
-│  (Django app with rag_integration custom module)    │
-│                                                     │
-│  Upload ──► Celery task ──► POST /index ────────┐   │
-│  Search ──► AI button   ──► POST /query ─────┐  │   │
-└──────────────────────────────────────────────┼──┼───┘
-                                               │  │
-┌──────────────────────────────────────────────┼──┼───┐
-│              Hybrid RAG Server (FastAPI)      │  │   │
-│                                               ▼  ▼   │
-│  Indexing Pipeline:                                   │
-│    Doc type detection → Metadata extraction           │
-│    → Semantic chunking → Boilerplate filter           │
-│    → Summarization → Dense + Sparse embeddings        │
-│    → Store in Qdrant                                  │
-│                                                       │
-│  Query Pipeline:                                      │
-│    Query metadata extraction → Hybrid retrieval       │
-│    → Permission filtering → Cross-encoder reranking   │
-│    → Prompt building → LLM → Answer                   │
-└───────────────────┬───────────────┬───────────────────┘
-                    │               │
-              ┌─────▼─────┐  ┌──────▼──────┐
-              │   Qdrant   │  │ Azure OpenAI│
-              │  (vectors) │  │  or Ollama  │
-              └────────────┘  └─────────────┘
-```
+![Architecture Diagram](hybrid_rag_qa/docs/architecture.png)
 
 All services run in Docker containers on a single bridge network.
 
