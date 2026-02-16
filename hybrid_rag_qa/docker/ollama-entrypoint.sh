@@ -4,7 +4,7 @@
 # Start Ollama server in the background
 ollama serve &
 
-# Wait for the server to be ready (use 'ollama list' — curl/wget may not exist)
+# Wait for the server to be ready (use 'ollama list' â€” curl/wget may not exist)
 echo "Waiting for Ollama server to start..."
 until ollama list > /dev/null 2>&1; do
     sleep 2
