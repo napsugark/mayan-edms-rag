@@ -19,6 +19,8 @@ __pycache__/
 
 # documentation and data
 docs/
+!docs/*.png
+!docs/*.svg
 data/
 logs/
 
