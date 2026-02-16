@@ -2,6 +2,8 @@
 
 An AI-assisted document search system built on top of [Mayan EDMS](https://www.mayan-edms.com/), a free open-source document management system. A Retrieval-Augmented Generation (RAG) backend indexes documents stored in Mayan, enriches them with LLM-extracted metadata and summaries, and provides natural-language question answering directly from within the Mayan UI.
 
+The Mayan EDMS code in `mayan-edms-new/` is a [fork of the official Mayan EDMS repository](https://gitlab.com/napsugar.kelemen/mayan-edms/-/tree/rag-integration) with a custom `rag_integration` Django app added on the `rag-integration` branch.
+
 > **Status:** This is a learning / portfolio project. It works end-to-end but has known limitations (see [Limitations & Assessment](#limitations--assessment) below). The RAG pipeline is specialized for **Romanian official documents** (invoices, contracts, receipts) and will need adaptation for other document types or languages.
 
 ---
