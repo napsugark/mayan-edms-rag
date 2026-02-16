@@ -1,0 +1,4 @@
+[submodule "mayan-edms-new"]
+	path = mayan-edms-new
+	url = https://github.com/napsugark/mayan-edms.git
+	branch = rag-integration
