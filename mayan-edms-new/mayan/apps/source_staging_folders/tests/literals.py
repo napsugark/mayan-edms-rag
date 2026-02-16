@@ -1,0 +1,1 @@
+TEST_SOURCE_BACKEND_PATH_STAGING_FOLDER = 'mayan.apps.source_staging_folders.source_backends.SourceBackendStagingFolder'

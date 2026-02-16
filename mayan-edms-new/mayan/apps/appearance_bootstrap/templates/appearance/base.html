@@ -1,0 +1,72 @@
+{% load i18n %}
+{% load static %}
+
+{% load appearance_tags %}
+{% load common_tags %}
+{% load navigation_tags %}
+{% load smart_settings_tags %}
+{% load templating_tags %}
+
+{% spaceless %}
+
+<script>
+    if (typeof partialNavigation === 'undefined') {
+        /* Check if the template was not loaded via AJAX
+         * If not then reload the root path passing the
+         * current location's path as the new hash.
+         */
+        document.write('<script type="text/undefined">')
+        const currentLocation = '#' + window.location.pathname + window.location.search;
+        const url = new URL(currentLocation, window.location.origin)
+        window.location = url;
+    }
+</script>
+
+{% block stylesheets %}{% endblock %}
+
+{% if appearance_type != 'plain' %}
+    <div class="">
+        {% navigation_resolve_menus names='facet,list facet,related,return,sources' sort_results=True as sidebar_menus_link_results %}
+        <div class="row zero-margin">
+            <div class="col-xs-12 {% if sidebar_menus_link_results %}has-sidebar{% endif %}" id="viewport">
+                <div class="row zero-margin">
+                    <div class="col-xs-12">
+                        {% block messages %}
+                        {% endblock %}
+
+                        {% appearance_app_templates template_name='viewport' %}
+                    </div>
+                </div>
+                {% include 'appearance/partials/title.html' %}
+                {% include 'appearance/partials/actions.html' %}
+{% endif %}
+                {% block content %}{% endblock content %}
+{% if appearance_type != 'plain' %}
+                {% block footer %}{% endblock %}
+            </div>
+            {% include 'appearance/partials/sidebar.html' %}
+        </div>
+    </div>
+{% endif %}
+
+{% block javascript %}{% endblock %}
+
+<script>
+    document.title = $('#appearance-title-text').text() + ' :: {% block project_name %}{% common_get_project_title %}{% endblock %}';
+
+    jQuery(document).ready(function() {
+        $('[data-toggle="tooltip"]').tooltip();
+
+        let djangoMessages = [
+            {% for message in messages %}
+                {
+                    tags: '{{ message.tags }}',
+                    message: '{{ message.message }}'
+                },
+            {% endfor %}
+        ];
+
+        app.afterBaseLoad({'djangoMessages': djangoMessages});
+    });
+</script>
+{% endspaceless %}

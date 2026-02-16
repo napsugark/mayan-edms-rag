@@ -1,0 +1,1 @@
+TEST_SOURCE_BACKEND_WATCH_STORAGE_PATH = 'mayan.apps.source_watch_storages.source_backends.SourceBackendWatchStorage'

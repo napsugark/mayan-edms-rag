@@ -1,0 +1,50 @@
+Version 4.6.3
+=============
+
+Released: March 28, 2024
+
+This version includes the changes from versions 4.4.14, 4.5.11 plus the
+following:
+
+
+Changes
+-------
+
+
+Documents
+^^^^^^^^^
+
+Fixed the missing content in the document print and password reset templates.
+
+
+Other
+^^^^^
+
+- Add path support to the URL class.
+- Fix display of build number.
+
+
+Removals
+--------
+
+.. include:: partials/removals-4.6.txt
+
+
+Backward incompatible changes
+-----------------------------
+
+.. include:: partials/backward-incompatible-4.6.txt
+
+
+Deprecations
+------------
+
+.. include:: partials/deprecations-4.6.txt
+
+
+Issues closed
+-------------
+
+- None
+
+.. _PyPI: https://pypi.python.org/pypi/mayan-edms/

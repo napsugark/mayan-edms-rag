@@ -1,0 +1,10 @@
+<script>
+    'use strict';
+
+    $('body').on('click', '.source_stored_files-stored_file-select', function (event) {
+        const $storedSourceFileID = $('#id_source-stored_source_file_id');
+        $storedSourceFileID.val($(this).data('encoded_filename'));
+        $storedSourceFileID.trigger('change');
+        event.preventDefault();
+    });
+</script>

@@ -1,0 +1,5 @@
+<ul>
+    {% for trigger in value.all %}
+    <li>{{ trigger.event_type.label }}</li>
+    {% endfor %}
+</ul>

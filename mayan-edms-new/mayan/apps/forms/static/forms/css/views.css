@@ -1,0 +1,44 @@
+.dropzone .dz-preview .dz-details {
+    top: 25px;
+}
+
+.dropzone .dz-preview .dz-progress {
+    top: 60%;
+}
+
+.dropzone .dz-preview .dz-error-message {
+    overflow-wrap: break-word;
+    padding: 1.2em;
+    top: 180px;
+    left: -40px;
+    width: 200px;
+}
+
+.dropzone .dz-preview .dz-error-message:after {
+    left: 90px;
+}
+
+.dropzone .dz-preview .dz-details .dz-filename span,
+.dropzone .dz-preview .dz-details .dz-size span {
+    padding: 0px;
+}
+
+.dropzone {
+    min-height: 150px;
+    border: inherit;
+    background: inherit;
+    padding: 0px;
+}
+
+.dropzone-previews, .dropzone .dz-message {
+    background: white;
+}
+
+.dropzone .dz-preview.dz-success .dz-success-mark {
+    -webkit-animation: slide-in 3s cubic-bezier(0.77, 0, 0.175, 1);
+    -moz-animation: slide-in 3s cubic-bezier(0.77, 0, 0.175, 1);
+    -ms-animation: slide-in 3s cubic-bezier(0.77, 0, 0.175, 1);
+    -o-animation: slide-in 3s cubic-bezier(0.77, 0, 0.175, 1);
+    animation: slide-in 3s cubic-bezier(0.77, 0, 0.175, 1);
+    opacity: 1;
+}

@@ -1,0 +1,51 @@
+Version 4.5.3
+=============
+
+Released: September 30, 2023
+
+Status: Stable
+
+Changes
+-------
+
+Documentation
+^^^^^^^^^^^^^
+
+Migrated the following documentations chapters to the Knowledge Base:
+
+- OCR
+- Workflows
+- Storage
+
+
+Sources
+^^^^^^^
+
+Fixed the periodic task creation used for periodic sources. A migration was
+added to fix previously created periodic sources.
+
+
+Removals
+--------
+
+.. include:: partials/removals-4.5.txt
+
+
+Backward incompatible changes
+-----------------------------
+
+.. include:: partials/backward-incompatible-4.5.txt
+
+
+Deprecations
+------------
+
+.. include:: partials/deprecations-4.5.txt
+
+
+Issues closed
+-------------
+
+- None
+
+.. _PyPI: https://pypi.python.org/pypi/mayan-edms/

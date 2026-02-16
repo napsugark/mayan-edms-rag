@@ -1,0 +1,2 @@
+TEST_SOURCE_BACKEND_PATH_INTERACTIVE = 'mayan.apps.source_interactive.tests.source_backends.SourceBackendTestInteractive'
+TEST_SOURCE_BACKEND_PATH_INTERACTIVE_ACTION = 'mayan.apps.source_interactive.tests.source_backends.SourceBackendTestInteractiveAction'

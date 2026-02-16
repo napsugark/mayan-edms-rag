@@ -1,0 +1,114 @@
+{% extends 'appearance/base_plain.html' %}
+
+{% load i18n %}
+{% load static %}
+
+{% load appearance_tags %}
+{% load common_tags %}
+{% load smart_settings_tags %}
+
+{% block base_title %}{% trans 'Login' %}{% endblock %}
+
+{% block project_name %}{% endblock %}
+
+{% block content %}
+    {% appearance_app_templates template_name='login_content' %}
+
+    <div class="row">
+        <div class="col-xs-10 col-xs-offset-1 col-sm-8 col-sm-offset-2 col-md-6 col-md-offset-3 col-lg-4 col-lg-offset-4">
+
+            <div class="panel panel-primary">
+                <div class="panel-body">
+
+                    <div id="authentication-login-image-wrapper">
+                        <img class="center-block img-responsive" id="authentication-login-image-top" src="{% static 'authentication/images/login-top.jpg' %}"/>
+                    </div>
+
+                    <div class="content login">
+                        {% if form.is_multipart %}
+                            <form action="{{ form_action }}" class="{{ form_css_classes|default:'form login' }}" enctype="multipart/form-data" method="{{ submit_method|default:'post' }}" name="{{ form.prefix|default:'' }}" target="{{ submit_target|default:'_self' }}">
+                        {% else %}
+                            <form action="{{ form_action }}" class="{{ form_css_classes|default:'form login' }}" method="{{ submit_method|default:'post' }}" name="{{ form.prefix|default:'' }}" target="{{ submit_target|default:'_self' }}">
+                        {% endif %}
+                            {% csrf_token %}
+                            <div class="group wat-cf">
+                                {{ wizard.management_form }}
+
+                                {% if wizard.form.forms %}
+                                    {{ wizard.form.management_form }}
+
+                                    {% with wizard.form as form %}
+                                    {% with 'true' as form_display_mode_table %}
+                                        {% include 'appearance/partials/form/body.html' %}
+                                    {% endwith %}
+                                    {% endwith %}
+                                {% else %}
+                                    {% if wizard.form %}
+                                        {% with wizard.form as form %}
+                                            {% include 'appearance/partials/form/body.html' %}
+                                        {% endwith %}
+                                    {% else %}
+                                        {% include 'appearance/partials/form/body.html' %}
+                                    {% endif %}
+                                {% endif %}
+
+                                <input type="hidden" name="next" value="{{ next|escape }}" />
+
+                                <div class="form-group">
+                                    {% for button in form_button_overrides %}
+                                        <button class="btn btn-primary {{ button.css_classes }}{% if button.is_primary %}btn-hotkey-default{% endif %}" {% if button.disabled %}disabled="disabled"{% endif %} name="{% if button.name_override %}{{ button.name_override }}{% else %}{% if form.prefix %}{{ form.prefix }}-{{ button.name }}{% else %}{{ button.name }}{% endif %}{% endif %}" type="submit" value="{{ button.value }}">
+                                            {% if button.icon %}
+                                                {{ button.icon.render }}
+                                            {% else %}
+                                                <i class="fa fa-check"></i>
+                                            {% endif %}
+                                            {% if button.label %}{{ button.label }}{% else %}{% if object %}{% trans 'Save' %}{% else %}{% trans 'Submit' %}{% endif %}{% endif %}
+                                        </button>
+                                        &nbsp;
+                                    {% empty %}
+                                        <button class="{{ submit_button_css_classes|default:'btn btn-primary btn-hotkey-default' }} {{ submit_button_css_extra_classes }}" name="{% if form.prefix %}{{ form.prefix }}-submit{% else %}submit{% endif %}" type="submit">
+                                            {% if submit_icon %}
+                                                {{ submit_icon.render }}
+                                            {% else %}
+                                                <i class="fa fa-check"></i>
+                                            {% endif %}
+                                            {% if submit_label %}{{ submit_label }}{% else %}{% if form.instance %}{% trans 'Save' %}{% else %}{% trans 'Submit' %}{% endif %}{% endif %}
+                                        </button>
+                                        {% if previous %}
+                                              &nbsp;<a class="btn btn-default" onclick='history.back();'>
+                                                <i class="fa fa-times"></i> {% if cancel_label %}{{ cancel_label }}{% else %}{% trans 'Cancel' %}{% endif %}
+                                              </a>
+                                        {% endif %}
+
+                                        {% for button in extra_buttons %}
+                                            &nbsp;
+                                            <button class="btn btn-default" name="{% if form.prefix %}{{ form.prefix }}-{{ button.name }}{% else %}{{ button.name }}{% endif %}" type="submit">
+                                                {% if button.icon %}
+                                                    {{ button.icon.render }}
+                                                {% endif %}
+                                                {% if button.label %}{{ button.label }}{% else %}{% if object %}{% trans 'Save' %}{% else %}{% trans 'Submit' %}{% endif %}{% endif %}
+                                            </button>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </form>
+
+                        <hr>
+
+                        <p class="text-center small">
+                            {% common_project_information '__copyright__' %}
+                        </p>
+
+                        {% smart_setting global_name="AUTHENTICATION_DISABLE_PASSWORD_RESET" as setting_disable_password_reset %}
+                        {% if not setting_disable_password_reset %}
+                            <div class="text-center">
+                                <a href="{% url 'authentication:password_reset_view' %}">{% trans 'Forgot your password?' %}</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

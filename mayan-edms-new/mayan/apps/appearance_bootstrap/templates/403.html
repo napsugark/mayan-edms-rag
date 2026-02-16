@@ -1,0 +1,25 @@
+{% extends 'appearance/base.html' %}
+
+{% load i18n %}
+
+{% block title %}{% blocktrans %}Insufficient permission{% endblocktrans %}{% endblock %}
+
+{% block content %}
+    <div class="appearance-div-error">
+        <div class="row">
+            <div class="col-xs-12">
+                <div class="text-center">
+                    <span class="fa-stack fa-2x appearance-icon-error">
+                        <i class="fas fa-display fa-stack-2x"></i>
+                        <i class="fas fa-lock fa-stack-1x fa-2x" data-fa-transform="right-10 up-3"></i>
+                    </span>
+                </div>
+
+                <h3 class="title text-center">{% trans 'Insufficient permission' %}</h3>
+                <div class="inner text-center">
+                    <p>{% blocktrans %}You don't have enough permissions for this operation.{% endblocktrans %}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

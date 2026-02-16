@@ -1,0 +1,472 @@
+
+
+.job_docker_push_variables:
+  &job_docker_push_variables
+    PYTHON_BIN: /usr/bin/python3
+    VERSION_SCRIPT_BIN: mayan/apps/dependencies/versions.py
+
+stages:
+  - stage_build_python
+  - stage_test_python
+  - stage_build_container
+  - stage_build_documentation
+  - stage_push
+  - stage_deploy
+
+# Docker
+
+job_docker_build:
+  before_script:
+    - set -a && sed -E "s/=(.*)/\=\"\1\"/g" config.env > /tmp/config.env && . /tmp/config.env && rm /tmp/config.env && set +a
+    - mkdir --parents ${APK_CACHE_DIR}
+    - apk update
+    - docker login --username ${CI_REGISTRY_PUSH_USER} --password ${CI_REGISTRY_PUSH_PASSWORD} ${CI_REGISTRY}
+    - apk update
+    - apk add --cache-dir ${APK_CACHE_DIR} cairo gcc libffi-dev libjpeg-turbo-dev libmagic make musl-dev zlib-dev python3 python3-dev py3-packaging
+    - python3 -m venv venv
+    - . venv/bin/activate
+    - pip install pip==${PYTHON_PIP_VERSION}
+    - pip install --requirement requirements/common.txt
+    - cat requirements/base.txt | grep -v 'django-auth-ldap'| pip install -r /dev/stdin
+  cache:
+    - key: apk-cache-4.10
+      paths:
+        - ${APK_CACHE_DIR}
+    - key: pip-cache-4.10
+      paths:
+        - ${PIP_CACHE_DIR}
+  image: docker:28.2.2-dind
+  only:
+    - ci/builds/docker
+    - ci/releases/all/major
+    - ci/releases/all/minor
+    - ci/releases/docker/major
+    - ci/releases/docker/minor
+    - ci/releases/nightly
+    - ci/releases/staging
+    - ci/tests/all
+    - ci/tests/docker
+  script:
+    - DOCKER_VERSION=`cat docker/rootfs/version`
+    - make docker-build DOCKER_IMAGE_MAYAN_NAME=${CI_REGISTRY_IMAGE} IMAGE_VERSION=${DOCKER_VERSION} DOCKER_IMAGE_LABELS_EXTRA='--label com.gitlab.ci.job.id=${CI_JOB_ID} --label com.gitlab.ci.pipeline.id=${CI_PIPELINE_ID} --label org.opencontainers.image.revision=${CI_COMMIT_SHA}'
+    - docker push "${CI_REGISTRY_IMAGE}:${DOCKER_VERSION}"
+  services:
+    - docker:28.2.2-dind
+  stage: stage_build_container
+  variables:
+    DOCKER_DRIVER: overlay2
+    APK_CACHE_DIR: ${CI_PROJECT_DIR}/.cache/apk
+    PIP_CACHE_DIR: ${CI_PROJECT_DIR}/.cache/pip
+
+job_docker_push_major:
+  before_script:
+    - set -a && sed -E "s/=(.*)/\=\"\1\"/g" config.env > /tmp/config.env && . /tmp/config.env && rm /tmp/config.env && set +a
+    - mkdir --parents ${APK_CACHE_DIR}
+    - apk update
+    - apk add --cache-dir ${APK_CACHE_DIR} python3 python3-dev py3-packaging
+    - docker login --username ${CI_REGISTRY_PUSH_USER} --password ${CI_REGISTRY_PUSH_PASSWORD} ${CI_REGISTRY}
+  cache:
+    - key: apk-cache-4.10
+      paths:
+        - ${APK_CACHE_DIR}
+  image: docker:28.2.2-cli
+  only:
+    - ci/releases/all/major
+    - ci/releases/docker/major
+  script:
+    - DOCKER_VERSION=`cat docker/rootfs/version`
+    - docker pull "${CI_REGISTRY_IMAGE}:${DOCKER_VERSION}"
+    - docker tag "${CI_REGISTRY_IMAGE}:${DOCKER_VERSION}" registry-1.docker.io/mayanedms/mayanedms:v"${DOCKER_VERSION}"
+    - docker tag "${CI_REGISTRY_IMAGE}:${DOCKER_VERSION}" registry-1.docker.io/mayanedms/mayanedms:latest
+    - MAJOR_VERSION=$(${PYTHON_BIN} ${VERSION_SCRIPT_BIN} ${DOCKER_VERSION} major);
+    - docker tag "${CI_REGISTRY_IMAGE}:${DOCKER_VERSION}" registry-1.docker.io/mayanedms/mayanedms:s"${MAJOR_VERSION}"
+    - MINOR_VERSION=$(${PYTHON_BIN} ${VERSION_SCRIPT_BIN} ${DOCKER_VERSION} minor);
+    - docker tag "${CI_REGISTRY_IMAGE}:${DOCKER_VERSION}" registry-1.docker.io/mayanedms/mayanedms:s"${MINOR_VERSION}"
+    - docker login --username "${DOCKER_HUB_USERNAME}" --password "${DOCKER_HUB_PASSWORD}" https://registry-1.docker.io
+    - docker push registry-1.docker.io/mayanedms/mayanedms:v"${DOCKER_VERSION}"
+    - docker push registry-1.docker.io/mayanedms/mayanedms:latest
+    - docker push registry-1.docker.io/mayanedms/mayanedms:s"${MAJOR_VERSION}"
+    - docker push registry-1.docker.io/mayanedms/mayanedms:s"${MINOR_VERSION}"
+  services:
+    - docker:28.2.2-dind
+  stage: stage_push
+  variables:
+    DOCKER_DRIVER: overlay2
+    APK_CACHE_DIR: ${CI_PROJECT_DIR}/.cache/apk
+    << : *job_docker_push_variables
+
+job_docker_push_minor:
+  before_script:
+    - set -a && sed -E "s/=(.*)/\=\"\1\"/g" config.env > /tmp/config.env && . /tmp/config.env && rm /tmp/config.env && set +a
+    - mkdir --parents ${APK_CACHE_DIR}
+    - apk update
+    - apk add --cache-dir ${APK_CACHE_DIR} python3 python3-dev py3-packaging
+    - docker login --username ${CI_REGISTRY_PUSH_USER} --password ${CI_REGISTRY_PUSH_PASSWORD} ${CI_REGISTRY}
+  cache:
+    - key: apk-cache-4.10
+      paths:
+        - ${APK_CACHE_DIR}
+  image: docker:28.2.2-cli
+  only:
+    - ci/releases/all/minor
+    - ci/releases/docker/minor
+  script:
+    - DOCKER_VERSION=`cat docker/rootfs/version`
+    - docker pull "${CI_REGISTRY_IMAGE}:${DOCKER_VERSION}"
+    - docker tag "${CI_REGISTRY_IMAGE}:${DOCKER_VERSION}" registry-1.docker.io/mayanedms/mayanedms:v"${DOCKER_VERSION}"
+    - MINOR_VERSION=$(${PYTHON_BIN} ${VERSION_SCRIPT_BIN} ${DOCKER_VERSION} minor);
+    - docker tag "${CI_REGISTRY_IMAGE}:${DOCKER_VERSION}" registry-1.docker.io/mayanedms/mayanedms:s"${MINOR_VERSION}"
+    - docker login --username "${DOCKER_HUB_USERNAME}" --password "${DOCKER_HUB_PASSWORD}" https://registry-1.docker.io
+    - docker push registry-1.docker.io/mayanedms/mayanedms:v"${DOCKER_VERSION}"
+    - docker push registry-1.docker.io/mayanedms/mayanedms:s"${MINOR_VERSION}"
+  services:
+    - docker:28.2.2-dind
+  stage: stage_push
+  variables:
+    DOCKER_DRIVER: overlay2
+    APK_CACHE_DIR: ${CI_PROJECT_DIR}/.cache/apk
+    << : *job_docker_push_variables
+
+job_docker_nightly:
+  before_script:
+    - set -a && sed -E "s/=(.*)/\=\"\1\"/g" config.env > /tmp/config.env && . /tmp/config.env && rm /tmp/config.env && set +a
+    - docker login --username ${CI_REGISTRY_PUSH_USER} --password ${CI_REGISTRY_PUSH_PASSWORD} ${CI_REGISTRY}
+  image: docker:28.2.2-cli
+  needs:
+    - job_docker_build
+  only:
+    - ci/releases/nightly
+  script:
+    - DOCKER_VERSION=`cat docker/rootfs/version`
+    - docker pull "${CI_REGISTRY_IMAGE}:${DOCKER_VERSION}"
+    - docker login --username "${DOCKER_HUB_USERNAME}" --password "${DOCKER_HUB_PASSWORD}" https://registry-1.docker.io
+    - docker tag "${CI_REGISTRY_IMAGE}:${DOCKER_VERSION}" "registry-1.docker.io/mayanedms/mayanedms:${CI_COMMIT_REF_SLUG}"
+    - docker push "registry-1.docker.io/mayanedms/mayanedms:${CI_COMMIT_REF_SLUG}"
+  services:
+    - docker:28.2.2-dind
+  stage: stage_push
+  variables:
+    DOCKER_DRIVER: overlay2
+
+# Documentation
+
+job_documentation_build:
+  artifacts:
+    expire_in: 24 hr
+    paths:
+    - docs
+  before_script:
+    - set -a && sed -E "s/=(.*)/\=\"\1\"/g" config.env > /tmp/config.env && . /tmp/config.env && rm /tmp/config.env && set +a
+    - export APT_STATE_LISTS=${APT_CACHE_DIR}/lists && export APT_CACHE_ARCHIVES=${APT_CACHE_DIR}/archives
+    - mkdir --parents "${APT_STATE_LISTS}/partial" && mkdir --parents "${APT_CACHE_ARCHIVES}/partial"
+    - printf "dir::state::lists    ${APT_STATE_LISTS};\ndir::cache::archives    ${APT_CACHE_ARCHIVES};\n" > /etc/apt/apt.conf.d/99gitlab-ci-cache
+    - if [ "${APT_PROXY}" ]; then echo "Acquire::http { Proxy \"http://${APT_PROXY}\"; };" > /etc/apt/apt.conf.d/01proxy; fi
+    - apt-get update
+    - apt-get install --yes --no-install-recommends enchant-2 graphviz libcairo2 g++ gcc libffi-dev libjpeg-dev libldap2-dev libpng-dev libsasl2-dev libssl-dev libtiff-dev make pkg-config zlib1g-dev make python3-dev python3-venv
+    - python3 -m venv venv
+    - . venv/bin/activate
+    - pip install pip==${PYTHON_PIP_VERSION}
+    - pip install setuptools==${PYTHON_SETUPTOOLS_VERSION}
+    - pip install wheel==${PYTHON_WHEEL_VERSION}
+  cache:
+    - key: apt-cache-4.10
+      paths:
+        - ${APT_CACHE_DIR}
+    - key: pip-cache-4.10
+      paths:
+        - ${PIP_CACHE_DIR}
+  image: debian:12.11-slim
+  only:
+    - ci/builds/documentation
+    - ci/releases/all/major
+    - ci/releases/documentation
+    - ci/tests/all
+  script:
+    - pip install --requirement requirements/common.txt
+    - pip install --requirement requirements/base.txt
+    - pip install --requirement requirements/documentation.txt
+    - pip install --requirement requirements/documentation_override.txt
+    - make docs-html
+  stage: stage_build_documentation
+  variables:
+    APT_CACHE_DIR: ${CI_PROJECT_DIR}/.cache/apt
+    PIP_CACHE_DIR: ${CI_PROJECT_DIR}/.cache/pip
+
+job_documentation_push:
+  before_script:
+    - set -a && sed -E "s/=(.*)/\=\"\1\"/g" config.env > /tmp/config.env && . /tmp/config.env && rm /tmp/config.env && set +a
+    - export APT_STATE_LISTS=${APT_CACHE_DIR}/lists && export APT_CACHE_ARCHIVES=${APT_CACHE_DIR}/archives
+    - mkdir --parents "${APT_STATE_LISTS}/partial" && mkdir --parents "${APT_CACHE_ARCHIVES}/partial"
+    - printf "dir::state::lists    ${APT_STATE_LISTS};\ndir::cache::archives    ${APT_CACHE_ARCHIVES};\n" > /etc/apt/apt.conf.d/99gitlab-ci-cache
+    - if [ "${APT_PROXY}" ]; then echo "Acquire::http { Proxy \"http://${APT_PROXY}\"; };" > /etc/apt/apt.conf.d/01proxy; fi
+    - apt-get update
+    - mkdir --parents ~/.ssh
+    - chmod 700 ~/.ssh
+    - echo "${DOCUMENTATION_SSH_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+    - 'which ssh-agent || ( apt-get update --yes && apt-get install --yes --no-install-recommends openssh-client rsync )'
+    - eval $(ssh-agent -s)
+    - echo "${DOCUMENTATION_SSH_PRIVATE_KEY}" | tr -d '\r' | ssh-add - > /dev/null
+  cache:
+    - key: apt-cache-4.10
+      paths:
+        - ${APT_CACHE_DIR}
+    - key: pip-cache-4.10
+      paths:
+        - ${PIP_CACHE_DIR}
+  image: debian:12.11-slim
+  only:
+    - ci/releases/all/major
+    - ci/releases/documentation
+  script:
+    - ssh ${DOCUMENTATION_SSH_USERNAME}@${DOCUMENTATION_HOSTNAME} "rm -Rf ${DOCUMENTATION_SERVER_PATH}/*"
+    - rsync -avzP --progress -e ssh docs/_build/html/* ${DOCUMENTATION_SSH_USERNAME}@${DOCUMENTATION_HOSTNAME}:${DOCUMENTATION_SERVER_PATH}
+  stage: stage_push
+  variables:
+    APT_CACHE_DIR: ${CI_PROJECT_DIR}/.cache/apt
+    PIP_CACHE_DIR: ${CI_PROJECT_DIR}/.cache/pip
+
+# Python
+
+job_python_build:
+  artifacts:
+    expire_in: 24 hr
+    paths:
+    - dist
+  before_script:
+    - set -a && sed -E "s/=(.*)/\=\"\1\"/g" config.env > /tmp/config.env && . /tmp/config.env && rm /tmp/config.env && set +a
+    - export APT_STATE_LISTS=${APT_CACHE_DIR}/lists && export APT_CACHE_ARCHIVES=${APT_CACHE_DIR}/archives
+    - mkdir --parents "${APT_STATE_LISTS}/partial" && mkdir --parents "${APT_CACHE_ARCHIVES}/partial"
+    - printf "dir::state::lists    ${APT_STATE_LISTS};\ndir::cache::archives    ${APT_CACHE_ARCHIVES};\n" > /etc/apt/apt.conf.d/99gitlab-ci-cache
+    - if [ "${APT_PROXY}" ]; then echo "Acquire::http { Proxy \"http://${APT_PROXY}\"; };" > /etc/apt/apt.conf.d/01proxy; fi
+    - apt-get update
+    - apt-get update
+    - apt-get install --yes --no-install-recommends make python3-dev python3-venv
+    - python3 -m venv venv
+    - . venv/bin/activate
+    - pip install pip==${PYTHON_PIP_VERSION}
+    - pip install setuptools==${PYTHON_SETUPTOOLS_VERSION}
+    - pip install wheel==${PYTHON_WHEEL_VERSION}
+  cache:
+    - key: apt-cache-4.10
+      paths:
+        - ${APT_CACHE_DIR}
+    - key: pip-cache-4.10
+      paths:
+        - ${PIP_CACHE_DIR}
+  image: debian:12.11-slim
+  only:
+    - ci/builds/python
+    - ci/releases/all/major
+    - ci/releases/all/minor
+    - ci/releases/docker/major
+    - ci/releases/docker/minor
+    - ci/releases/python/major
+    - ci/releases/python/minor
+    - ci/releases/testing
+    - ci/tests/all
+    - ci/tests/python/all
+    - ci/tests/python/upgrade
+  script:
+    - pip install --requirement requirements/build.txt
+    - make python-wheel-production
+  stage: stage_build_python
+  variables:
+    APT_CACHE_DIR: ${CI_PROJECT_DIR}/.cache/apt
+    PIP_CACHE_DIR: ${CI_PROJECT_DIR}/.cache/pip
+
+job_python_push_pypi:
+  before_script:
+    - set -a && sed -E "s/=(.*)/\=\"\1\"/g" config.env > /tmp/config.env && . /tmp/config.env && rm /tmp/config.env && set +a
+    - export APT_STATE_LISTS=${APT_CACHE_DIR}/lists && export APT_CACHE_ARCHIVES=${APT_CACHE_DIR}/archives
+    - mkdir --parents "${APT_STATE_LISTS}/partial" && mkdir --parents "${APT_CACHE_ARCHIVES}/partial"
+    - printf "dir::state::lists    ${APT_STATE_LISTS};\ndir::cache::archives    ${APT_CACHE_ARCHIVES};\n" > /etc/apt/apt.conf.d/99gitlab-ci-cache
+    - if [ "${APT_PROXY}" ]; then echo "Acquire::http { Proxy \"http://${APT_PROXY}\"; };" > /etc/apt/apt.conf.d/01proxy; fi
+    - apt-get update
+    - apt-get update
+    - apt-get install --yes --no-install-recommends make python3-dev python3-venv
+    - python3 -m venv venv
+    - . venv/bin/activate
+    - pip install pip==${PYTHON_PIP_VERSION}
+  cache:
+    - key: apt-cache-4.10
+      paths:
+        - ${APT_CACHE_DIR}
+    - key: pip-cache-4.10
+      paths:
+        - ${PIP_CACHE_DIR}
+  image: debian:12.11-slim
+  only:
+    - ci/releases/all/major
+    - ci/releases/all/minor
+    - ci/releases/python/major
+    - ci/releases/python/minor
+    - ci/releases/testing
+  script:
+    - pip install --requirement requirements/build.txt
+    - twine upload --verbose dist/*
+  stage: stage_push
+  variables:
+    APT_CACHE_DIR: ${CI_PROJECT_DIR}/.cache/apt
+    PIP_CACHE_DIR: ${CI_PROJECT_DIR}/.cache/pip
+
+# Run the test suit
+
+.job_base_test:
+  &job_base_test
+  before_script:
+    - set -a && sed -E "s/=(.*)/\=\"\1\"/g" config.env > /tmp/config.env && . /tmp/config.env && rm /tmp/config.env && set +a
+    - export APT_STATE_LISTS=${APT_CACHE_DIR}/lists && export APT_CACHE_ARCHIVES=${APT_CACHE_DIR}/archives
+    - mkdir --parents "${APT_STATE_LISTS}/partial" && mkdir --parents "${APT_CACHE_ARCHIVES}/partial"
+    - printf "dir::state::lists    ${APT_STATE_LISTS};\ndir::cache::archives    ${APT_CACHE_ARCHIVES};\n" > /etc/apt/apt.conf.d/99gitlab-ci-cache
+    - if [ "${APT_PROXY}" ]; then echo "Acquire::http { Proxy \"http://${APT_PROXY}\"; };" > /etc/apt/apt.conf.d/01proxy; fi
+    - apt-get update
+    - apt-get install --yes --no-install-recommends ca-certificates clamav file fuse ghostscript git gnupg1 graphviz libarchive-zip-perl libfile-mimeinfo-perl libimage-exiftool-perl libmariadb3 libpq5 libreoffice-calc-nogui libreoffice-draw-nogui libreoffice-impress-nogui libreoffice-math-nogui libreoffice-writer-nogui poppler-utils sane-utils sudo supervisor tesseract-ocr g++ gcc libffi-dev libjpeg-dev libldap2-dev libpng-dev libsasl2-dev libssl-dev libtiff-dev make pkg-config zlib1g-dev make python3-dev python3-venv tesseract-ocr-deu
+    - python3 -m venv venv
+    - . venv/bin/activate
+    - pip install pip==${PYTHON_PIP_VERSION}
+    - pip install wheel==${PYTHON_WHEEL_VERSION}
+    - pip install --requirement requirements.txt --requirement requirements/testing-base.txt --requirement requirements/build.txt
+  cache:
+    - key: apt-cache-4.10
+      paths:
+        - ${APT_CACHE_DIR}
+    - key: pip-cache-4.10
+      paths:
+        - ${PIP_CACHE_DIR}
+  image: debian:12.11-slim
+  only:
+    - ci/releases/all/major
+    - ci/releases/all/minor
+    - ci/releases/docker/major
+    - ci/releases/docker/minor
+    - ci/releases/python/major
+    - ci/releases/python/minor
+    - ci/releases/staging
+    - ci/tests/all
+    - ci/tests/python/all
+    - ci/tests/python/base
+  stage: stage_test_python
+  variables:
+    APT_CACHE_DIR: ${CI_PROJECT_DIR}/.cache/apt
+    PIP_CACHE_DIR: ${CI_PROJECT_DIR}/.cache/pip
+
+job_postgres_test:
+  << : *job_base_test
+  script:
+    - apt-get install --yes --no-install-recommends libpq-dev
+    - . venv/bin/activate
+    - pip install psycopg==${PYTHON_PSYCOPG_VERSION}
+    - export MAYAN_DATABASES="{'default':{'ENGINE':'django.db.backends.postgresql','NAME':'mayan','PASSWORD':'mayandbpass','USER':'mayan','HOST':'postgres'}}"
+    - make test-all SETTINGS=mayan.settings.testing.gitlab-ci
+    - make test-migrations-all SETTINGS=mayan.settings.testing.gitlab-ci
+  services:
+    - postgres:15.14
+  variables:
+    POSTGRES_DB: "mayan"
+    POSTGRES_PASSWORD: "mayandbpass"
+    POSTGRES_USER: "mayan"
+
+job_sqlite_test:
+  << : *job_base_test
+  script:
+    - . venv/bin/activate
+    - make test-all SETTINGS=mayan.settings.testing.gitlab-ci
+    - make test-migrations-all SETTINGS=mayan.settings.testing.gitlab-ci
+
+# Deploy
+
+job_demo_deploy:
+  before_script:
+    - set -a && sed -E "s/=(.*)/\=\"\1\"/g" config.env > /tmp/config.env && . /tmp/config.env && rm /tmp/config.env && set +a
+    - export APT_STATE_LISTS=${APT_CACHE_DIR}/lists && export APT_CACHE_ARCHIVES=${APT_CACHE_DIR}/archives
+    - mkdir --parents "${APT_STATE_LISTS}/partial" && mkdir --parents "${APT_CACHE_ARCHIVES}/partial"
+    - printf "dir::state::lists    ${APT_STATE_LISTS};\ndir::cache::archives    ${APT_CACHE_ARCHIVES};\n" > /etc/apt/apt.conf.d/99gitlab-ci-cache
+    - if [ "${APT_PROXY}" ]; then echo "Acquire::http { Proxy \"http://${APT_PROXY}\"; };" > /etc/apt/apt.conf.d/01proxy; fi
+    - apt-get update
+    - mkdir --parents ~/.ssh
+    - chmod 700 ~/.ssh
+    - echo "${DEMO_SSH_KNOWN_HOST}" > ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+    - 'which ssh-agent || ( apt-get update --yes && apt-get install --yes --no-install-recommends openssh-client rsync )'
+    - eval $(ssh-agent -s)
+    - echo "${DEMO_PRIVATE_KEY}" | tr -d '\r' | ssh-add - > /dev/null
+  cache:
+    - key: apt-cache-4.10
+      paths:
+        - ${APT_CACHE_DIR}
+  environment:
+    name: demo
+  image: debian:12.11-slim
+  only:
+    - ci/builds/docker
+    - ci/deployments/demo
+    - ci/releases/all/major
+    - ci/releases/all/minor
+    - ci/releases/docker/major
+    - ci/releases/docker/minor
+    - ci/releases/nightly
+    - ci/releases/staging
+  script:
+    - ssh ${DEMO_USERNAME}@${DEMO_IP_ADDRESS} "curl --remote-name-all https://gitlab.com/mayan-edms/mayan-edms/-/raw/master/docker/{.env,docker-compose.yml} --show-error --silent && docker compose pull && docker compose down --remove-orphans --volumes || true && docker compose up --detach"
+  stage: stage_deploy
+  when: manual
+  variables:
+    APT_CACHE_DIR: ${CI_PROJECT_DIR}/.cache/apt
+
+job_staging_deploy:
+  before_script:
+    - set -a && sed -E "s/=(.*)/\=\"\1\"/g" config.env > /tmp/config.env && . /tmp/config.env && rm /tmp/config.env && set +a
+    - export APT_STATE_LISTS=${APT_CACHE_DIR}/lists && export APT_CACHE_ARCHIVES=${APT_CACHE_DIR}/archives
+    - mkdir --parents "${APT_STATE_LISTS}/partial" && mkdir --parents "${APT_CACHE_ARCHIVES}/partial"
+    - printf "dir::state::lists    ${APT_STATE_LISTS};\ndir::cache::archives    ${APT_CACHE_ARCHIVES};\n" > /etc/apt/apt.conf.d/99gitlab-ci-cache
+    - if [ "${APT_PROXY}" ]; then echo "Acquire::http { Proxy \"http://${APT_PROXY}\"; };" > /etc/apt/apt.conf.d/01proxy; fi
+    - apt-get update
+    - mkdir --parents ~/.ssh
+    - chmod 700 ~/.ssh
+    - echo "${STAGING_SSH_KNOWN_HOST}" > ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+    - 'which ssh-agent || ( apt-get update --yes && apt-get install --yes --no-install-recommends openssh-client rsync )'
+    - eval $(ssh-agent -s)
+    - echo "${STAGING_PRIVATE_KEY}" | tr -d '\r' | ssh-add - > /dev/null
+  cache:
+    - key: apt-cache-4.10
+      paths:
+        - ${APT_CACHE_DIR}
+  environment:
+    name: staging
+  image: debian:12.11-slim
+  only:
+    - ci/builds/docker
+    - ci/deployments/staging
+    - ci/releases/all/major
+    - ci/releases/all/minor
+    - ci/releases/docker/major
+    - ci/releases/docker/minor
+    - ci/releases/nightly
+    - ci/releases/staging
+  script:
+    - ssh ${STAGING_SSH_USERNAME}@${STAGING_HOSTNAME} "docker compose down --remove-orphans --volumes || true"
+    - scp docker/.env docker/docker-compose.yml ${STAGING_SSH_USERNAME}@${STAGING_HOSTNAME}:~
+    - DOCKER_VERSION=`cat docker/rootfs/version`;
+    - ssh ${STAGING_SSH_USERNAME}@${STAGING_HOSTNAME} "echo \"\" >> .env && echo \"# GitLab CI\" >> .env && echo \"MAYAN_DOCKER_IMAGE_NAME=${CI_REGISTRY_IMAGE}\" >> .env && echo \"MAYAN_DOCKER_IMAGE_TAG=${DOCKER_VERSION}\" >> .env"
+    - ssh ${STAGING_SSH_USERNAME}@${STAGING_HOSTNAME} "docker login --username '${CI_REGISTRY_DEPLOY_USER}' --password '${CI_REGISTRY_DEPLOY_PASSWORD}' ${CI_REGISTRY} && docker compose pull && docker compose up --detach"
+  stage: stage_deploy
+  when: manual
+  variables:
+    APT_CACHE_DIR: ${CI_PROJECT_DIR}/.cache/apt
+
+# Combined
+
+job_docker_build_try:
+  extends: job_docker_build
+  only:
+    - ci/try/staging
+
+job_staging_deploy_try:
+  extends: job_staging_deploy
+  needs:
+    - job_docker_build_try
+  only:
+    - ci/try/staging
+  when: on_success

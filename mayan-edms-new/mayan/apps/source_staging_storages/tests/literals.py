@@ -1,0 +1,1 @@
+TEST_SOURCE_BACKEND_PATH_STAGING_STORAGE = 'mayan.apps.source_staging_storages.source_backends.SourceBackendStagingStorage'

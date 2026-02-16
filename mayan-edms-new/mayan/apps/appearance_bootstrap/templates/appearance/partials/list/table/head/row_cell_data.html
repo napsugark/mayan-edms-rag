@@ -1,0 +1,22 @@
+{% load navigation_tags %}
+
+{% if not hide_columns %}
+    {% for source_column in source_columns_non_identifier %}
+        <th>
+            <span style="white-space: nowrap">
+                {% if source_column.is_sortable %}
+                    <a href="{% navigation_get_sort_field_querystring column=source_column %}">{{ source_column.label }}</a>
+                        {% navigation_source_column_get_sort_icon column=source_column as icon_sort %}
+                        {% if icon_sort %}
+                            <span class="appearance-list-column-sort-icon">
+                                {{ icon_sort.render }}
+                            </span>
+                        {% endif %}
+                {% else %}
+                    <span class="appearance-list-column-label">{{ source_column.label }}</span>
+                {% endif %}
+                {% include 'appearance/partials/list/help_text.html' %}
+            </span>
+        </th>
+    {% endfor %}
+{% endif %}

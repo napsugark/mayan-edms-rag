@@ -1,0 +1,48 @@
+Version 4.5.6
+=============
+
+Released: October 12, 2023
+
+Status: Stable
+
+Changes
+-------
+
+Docker
+^^^^^^
+
+The Docker image ``entrypoint.sh`` file was updated to skip changing the
+ownership of files if ``MAYAN_COMMON_DISABLE_LOCAL_STORAGE`` is set to
+any truthy value (True, true, T, t, Yes, yes, Y, y, 1).
+
+
+Metadata
+^^^^^^^^
+
+Editing existing metadata workflow action was fixed.
+
+
+Removals
+--------
+
+.. include:: partials/removals-4.5.txt
+
+
+Backward incompatible changes
+-----------------------------
+
+.. include:: partials/backward-incompatible-4.5.txt
+
+
+Deprecations
+------------
+
+.. include:: partials/deprecations-4.5.txt
+
+
+Issues closed
+-------------
+
+- None
+
+.. _PyPI: https://pypi.python.org/pypi/mayan-edms/

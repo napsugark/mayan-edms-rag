@@ -1,0 +1,3 @@
+COMMAND_NAME_AUTHENTICATION_OTP_DISABLE = 'authentication_otp_disable'
+COMMAND_NAME_AUTHENTICATION_OTP_INITIALIZE = 'authentication_otp_initialize'
+COMMAND_NAME_AUTHENTICATION_OTP_STATUS = 'authentication_otp_status'

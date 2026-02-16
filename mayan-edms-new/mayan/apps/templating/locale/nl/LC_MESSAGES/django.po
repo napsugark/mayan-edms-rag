@@ -1,0 +1,138 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+# 
+# Translators:
+# bwakkie <bwakkie@gmail.com>, 2025
+# j jacobs <j.jacobs@rijnlandslyceum-rls.nl>, 2025
+# Roberto Rosario, 2025
+# 
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-10-30 19:40+0000\n"
+"PO-Revision-Date: 2025-10-30 19:40+0000\n"
+"Last-Translator: Roberto Rosario, 2025\n"
+"Language-Team: Dutch (https://app.transifex.com/rosarior/teams/13584/nl/)\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: nl\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: apps.py:16 permissions.py:6 settings.py:96
+msgid "Templating"
+msgstr "Sjablonering"
+
+#: apps.py:23
+msgid "Current date and time"
+msgstr ""
+
+#: classes.py:83
+#, python-format
+msgid "Model `%s` is not available for template sandbox."
+msgstr ""
+
+#: decorators.py:20
+msgid "None provided."
+msgstr ""
+
+#: decorators.py:22
+#, python-format
+msgid ""
+"Filter or tag \"%(name)s\" is considered dangerous and not allowed. Reason: "
+"%(reason)s Change setting `%(setting)s` to allow it."
+msgstr ""
+
+#: fields.py:28
+msgid "Use Django's default templating language. "
+msgstr ""
+
+#: fields.py:42
+#, python-format
+msgid "Available template context variables: %s"
+msgstr ""
+
+#: forms.py:10
+msgid "Resulting text from the evaluated template."
+msgstr "Resultaattekst uit het beoordeelde sjabloon."
+
+#: forms.py:11 serializers.py:24
+msgid "Result"
+msgstr "Resultaat"
+
+#: forms.py:25
+msgid "The template string to be evaluated."
+msgstr "De sjabloon tekenreeks om te beoordelen."
+
+#: forms.py:26 serializers.py:27
+msgid "Template"
+msgstr "Sjabloon"
+
+#: links.py:12
+msgid "Sandbox"
+msgstr "Sandbox"
+
+#: permissions.py:10
+msgid "Use the template sandbox"
+msgstr "De sjabloon sandbox gebruiken"
+
+#: serializers.py:8
+msgid "Hex hash"
+msgstr ""
+
+#: serializers.py:11
+msgid "Name"
+msgstr "Naam"
+
+#: serializers.py:14
+msgid "HTML"
+msgstr ""
+
+#: serializers.py:17
+msgid "URL"
+msgstr "URL"
+
+#: settings.py:102
+msgid ""
+"A comma separated list of dangerous templating tags and filters that are "
+"allowed."
+msgstr ""
+
+#: settings.py:110
+msgid ""
+"Theme name of the CSS stylesheet used to change the visual appearance of the"
+" template preview."
+msgstr ""
+
+#: templatetags/templating_tags.py:100
+msgid "Tag can bypass access controls and create permanent changes."
+msgstr ""
+
+#: views.py:59
+#, python-format
+msgid "Template sandbox for: %s"
+msgstr "Sjabloon sandbox voor: %s"
+
+#: views.py:86
+#, python-format
+msgid "Template error; %(exception)s"
+msgstr "Sjabloonfout; %(exception)s"
+
+#: widgets.py:43
+msgid "Filters"
+msgstr "Filters"
+
+#: widgets.py:50
+msgid "Tags"
+msgstr "Labels"
+
+#: widgets.py:57
+msgid "<Filters and tags>"
+msgstr "<filters and=\"en\" tags=\"labels\">"
+
+#: widgets.py:136
+msgid "<Model attributes>"
+msgstr "<model attributes=\"Modelattributen\">"

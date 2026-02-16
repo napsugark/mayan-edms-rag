@@ -1,0 +1,13 @@
+{% load i18n %}
+
+{% load fundraiser_tags %}
+
+{# appearance_app_template_nocache #}
+
+{% fundraiser_message_fetch path='/locations/about/' as message %}
+
+{% if message %}
+    <div class="well">
+        {{ message.body }}
+    </div>
+{% endif %}

@@ -1,0 +1,40 @@
+{% load i18n %}
+
+{% load appearance_tags %}
+{% load navigation_tags %}
+{% load views_tags %}
+
+<div id="list-toolbar-spacer"></div>
+<nav id="list-toolbar">
+    <div class="well center-block toolbar">
+        {% if links_multi_menus_results %}
+            <div class="pull-left">
+                <div class="btn-toolbar btn-toolbar-check-all" role="toolbar">
+                    <div class="form-group">
+                        <input type="checkbox" class="check-all" data-checked=false title="{% trans 'Select/Deselect all' %}"/>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        {% include 'appearance/partials/list/pagination.html' %}
+
+        {% appearance_app_templates template_name='list_toolbar' %}
+
+        {% if links_multi_menus_results %}
+            <div id="multi-item-title-responsible-wrapper">
+                <p class="pull-right" id="multi-item-title">{% trans 'Select items to activate bulk actions. Use Shift + click to select many.' %}</p>
+            </div>
+
+            <div class="pull-right btn-group" id="multi-item-actions">
+                {% trans 'Bulk actions' as action_dropdown_label %}
+                {% with links_multi_menus_results as action_menus_link_results %}
+                    {% include 'navigation/actions_dropdown.html' %}
+                {% endwith %}
+            </div>
+
+        {% endif %}
+
+        <div class="clearfix"></div>
+    </div>
+</nav>

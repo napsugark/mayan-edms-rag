@@ -1,0 +1,5 @@
+django-debug-toolbar==5.0.1
+django-extensions==3.2.3
+django-silk==5.3.2
+ipython==9.5.0
+readme==0.7.1

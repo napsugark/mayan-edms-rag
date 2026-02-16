@@ -1,0 +1,12 @@
+{% load navigation_tags %}
+
+{% if not hide_object %}
+    <td>{% if not hide_link %}<a href="{{ object.get_absolute_url }}">{{ object }}</a>{% else %}{{ object }}{% endif %}</td>
+{% else %}
+    {% if source_columns_identifier %}
+        {% navigation_source_column_resolve column=source_columns_identifier.0 as column_value %}
+        <td>
+            {{ column_value }}
+        </td>
+    {% endif %}
+{% endif %}

@@ -1,0 +1,8 @@
+{% if enable_shadow %}
+    <span class="fa-fw fa-layers fa-fw {{ html_data.class }} mayan-icon" id="{{ html_data.id }}" style="{{ html_data.style }}">
+        <i class="fa-fw fa fa-{{ symbol }} fashadow"></i>
+        <i class="fa-fw fa fa-{{ symbol }}"></i>
+    </span>
+{% else %}
+    <i class="fa-fw fa fa-{{ symbol }} {{ html_data.class }} mayan-icon {{ icon_css_classes_extra }}" id="{{ html_data.id }}" style="{{ html_data.style }}"></i>
+{% endif %}

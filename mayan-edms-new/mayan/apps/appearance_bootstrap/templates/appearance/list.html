@@ -1,0 +1,16 @@
+{% extends 'appearance/base.html' %}
+
+{% load i18n %}
+
+{% load navigation_tags %}
+
+{% block title %}{% include 'appearance/partials/title.html' with non_html_title=True %}{% endblock %}
+
+{% block content %}
+    {% if list_as_items %}
+        {% include 'appearance/partials/list/panels.html' %}
+    {% else %}
+        {% include 'appearance/partials/list/table.html' %}
+    {% endif %}
+{% endblock content %}
+

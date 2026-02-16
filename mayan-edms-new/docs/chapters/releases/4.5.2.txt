@@ -1,0 +1,44 @@
+Version 4.5.2
+=============
+
+Released: September 20, 2023
+
+Status: Stable
+
+Changes
+-------
+
+Sources
+^^^^^^^
+
+An issue triggered when a non compressed file was processed by a source
+configure to process all files as compressed was fixed.
+
+Migrations were added to fix source backend paths incorrectly updated during
+the upgrade to version 4.5.
+
+
+Removals
+--------
+
+.. include:: partials/removals-4.5.txt
+
+
+Backward incompatible changes
+-----------------------------
+
+.. include:: partials/backward-incompatible-4.5.txt
+
+
+Deprecations
+------------
+
+.. include:: partials/deprecations-4.5.txt
+
+
+Issues closed
+-------------
+
+- None
+
+.. _PyPI: https://pypi.python.org/pypi/mayan-edms/

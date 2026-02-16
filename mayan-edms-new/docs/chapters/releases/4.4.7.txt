@@ -1,0 +1,35 @@
+Version 4.4.7
+=============
+
+Released: June 3, 2023
+
+Status: Stable
+
+This version merges fixes and updates from version 4.3.9, 4.2.16 and
+4.2.17dev0.
+
+
+Removals
+--------
+
+.. include:: partials/removals-4.4.txt
+
+
+Backward incompatible changes
+-----------------------------
+
+.. include:: partials/backward-incompatible-4.4.txt
+
+
+Deprecations
+------------
+
+.. include:: partials/deprecations-4.4.txt
+
+
+Issues closed
+-------------
+
+- None
+
+.. _PyPI: https://pypi.python.org/pypi/mayan-edms/

@@ -1,0 +1,31 @@
+{# appearance_app_template_nocache #}
+{% load i18n %}
+
+{% load icons_tags %}
+{% load search_tags %}
+
+{% icons_get_icon "mayan.apps.dynamic_search.icons.icon_search_form_clear" extra_context__html_data__class="appearance-input-search-clear" extra_context__html_data__id="search-form-appearance-input-search-clear" extra_context__html_data__style="top: 1px;" as icon_search_form_clear %}
+
+<style>
+    #search-form-appearance-input-search-clear {
+        display: none;
+    }
+</style>
+
+{% if not search_disable_list_filtering and search_model %}
+    <div class="pull-left">
+        <div class="btn-toolbar btn-toolbar-search-filter" role="toolbar">
+            <form action="" id="search-form-filter" method="get" role="search">
+                <div class="form-group">
+                    {# Reset the paging on every filter update #}
+                    {# Avoids invalid page errors when the current page number is higher that the filter page count results #}
+                    <input class="form-control" id="search-filter-page" name="page" type="hidden" value="1">
+                    <span class="appearance-input-search-clearable">
+                        <input class="form-control input-sm" data-submit-on-clear="true" id="search-filter-input-terms" name="{% search_get_filter_prefix %}{% search_get_query_parameter_any_field %}" placeholder="{% trans 'Filter terms' %}" type="search" value="{% search_get_query_any_field_value query=filter_query %}">
+                        {{ icon_search_form_clear }}
+                    </span>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endif %}

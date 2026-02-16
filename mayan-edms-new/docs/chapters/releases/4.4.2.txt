@@ -1,0 +1,42 @@
+Version 4.4.2
+=============
+
+Released: January 23, 2023
+
+Status: Stable
+
+Changes
+-------
+
+User interface
+^^^^^^^^^^^^^^
+
+A patch was merged that ensures the server communication modal is not shown
+for interrupted AJAX requests.
+
+
+Removals
+--------
+
+.. include:: partials/removals-4.4.txt
+
+
+Backward incompatible changes
+-----------------------------
+
+.. include:: partials/backward-incompatible-4.4.txt
+
+
+Deprecations
+------------
+
+.. include:: partials/deprecations-4.4.txt
+
+
+Issues closed
+-------------
+
+- None
+
+
+.. _PyPI: https://pypi.python.org/pypi/mayan-edms/

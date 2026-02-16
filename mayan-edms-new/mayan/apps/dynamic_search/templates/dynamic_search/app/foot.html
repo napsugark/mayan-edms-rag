@@ -1,0 +1,19 @@
+{% load search_tags %}
+{% load smart_settings_tags %}
+
+{% search_get_default_search_model as default_search_model %}
+
+<script>
+    'use strict';
+
+    jQuery(document).ready(function() {
+        $('body').on('change', '.search-select-search-model', function (event) {
+            const $this = $(this);
+            const $searchAnchorSearchAdvanced = $this.parents('form').find('.search-anchor-search-advanced');
+
+            $searchAnchorSearchAdvanced.attr(
+                'href', "{% url 'search:search_advanced' %}?{% search_get_search_model_name_query_variable %}=" + $this.val()
+            );
+        });
+    });
+</script>

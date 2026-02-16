@@ -1,0 +1,192 @@
+.navbar-brand {
+    font-family: "IM Fell English SC", serif;
+}
+
+/* Make facet list group horizontal on small or smaller */
+@media (max-width: 767px) {
+    ul.list-group:after {
+        clear: both;
+        content: "";
+        display: block;
+    }
+
+    .list-group-item {
+        float: left;
+    }
+}
+
+/*
+ * Fix dropdowns inside responsive tables. On small viewports, the dropdown
+ * menu float is set to none in order to show centered with the dropdown
+ * button and the position is set to static to force the table to expand.
+ */
+@media (max-width: 767px) {
+    .table-responsive .dropdown-menu {
+        float: none;
+        position: static !important;
+    }
+}
+@media (min-width: 768px) {
+    .table-responsive {
+        overflow: inherit;
+    }
+
+    .table-responsive .dropdown-menu {
+        float: left;
+    }
+}
+
+/* Avoid sidebar ul-li displaying disc decoration on small screens. */
+@media (max-width: 767px) {
+    .list-group {
+        list-style-type: none;
+    }
+}
+
+hr {
+    margin-top: 5px;
+    margin-bottom: 11px;
+}
+
+/* Collapse navigation on medium or smaller */
+@media (max-width: 991px) {
+    .navbar-header {
+        float: none;
+    }
+    .navbar-left,.navbar-right {
+        float: none !important;
+    }
+    .navbar-toggle {
+        display: block;
+    }
+    .navbar-collapse {
+        border-top: 1px solid transparent;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+    .navbar-fixed-top {
+        border-width: 0 0 1px;
+        top: 0;
+    }
+    .navbar-collapse.collapse {
+        display: none!important;
+    }
+    .navbar-nav {
+        float: none!important;
+        margin-top: 7.5px;
+    }
+    .navbar-nav>li {
+        float: none;
+    }
+    .navbar-nav>li>a {
+        padding-bottom: 10px;
+        padding-top: 10px;
+    }
+    .collapse.in {
+        display:block !important;
+    }
+}
+
+/* Remove scroll bar caused by bootstraps -15px on .row margins */
+.zero-margin {
+    margin-left: -5px;
+    margin-right: 0px;
+}
+
+/* Remove scroll bar caused by bootstraps -15px on .row margins */
+/*
+ * Used by the generic_form template to avoid displaying a second scrollbar
+ * for the viewport when it has a carousel.
+ */
+.zero-margin .row-avoid-second-scrollbar {
+    margin-bottom: -15px;
+}
+
+/* Bootstrap button outline override. */
+.btn-outline {
+    background-color: transparent;
+    color: inherit;
+}
+
+.btn-primary.btn-outline {
+    color: #428bca;
+}
+
+.btn-success.btn-outline {
+    color: #5cb85c;
+}
+
+.btn-info.btn-outline {
+    color: #5bc0de;
+}
+
+.btn-warning.btn-outline {
+    color: #f0ad4e;
+}
+
+.btn-danger.btn-outline {
+    color: #d9534f;
+}
+
+.btn-default.btn-outline:hover,
+.btn-primary.btn-outline:hover,
+.btn-success.btn-outline:hover,
+.btn-info.btn-outline:hover,
+.btn-warning.btn-outline:hover,
+.btn-danger.btn-outline:hover {
+    color: #fff;
+}
+
+.btn-list > .btn {
+    margin-bottom: 2px;
+}
+
+.btn-list > .btn:not(:last-child) {
+    margin-right: 4px;
+}
+
+.btn-xs {
+    padding: 1px 5px 0px;
+}
+
+/*
+ * Top navigation
+ * Hide default border to remove 1px line.
+ */
+.navbar-fixed-top {
+    border: 0;
+}
+
+/* Navbar-brand mobile */
+.navbar-brand {
+    margin-left: 26px;
+}
+
+.navbar-fixed-top {
+    box-shadow: 0px 3px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* Customize toolbars for use in lists */
+
+.btn-toolbar {
+    margin-right: 5px;
+    padding-right: 5px;
+}
+
+.toolbar {
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 1px 1px 2px rgba(0, 0, 0, .3);
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    padding-left: 12px;
+    padding-right: 15px;
+    padding-top: 8px;
+}
+
+.btn-toolbar-check-all {
+    background-color: #95a5a6;
+    border-radius: 4px;
+    height: 35px;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 6px;
+}

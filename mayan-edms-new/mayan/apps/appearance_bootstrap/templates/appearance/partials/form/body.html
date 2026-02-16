@@ -1,0 +1,77 @@
+{% load i18n %}
+
+{% load widget_tweaks %}
+
+{% load appearance_tags %}
+{% load templating_tags %}
+
+{% for asset in form.media.render_css %}
+    {{ asset|safe }}
+{% endfor %}
+
+{% for group, errors in form.errors.items %}
+    {% for error in errors %}
+        <div class="alert alert-danger" role="alert">
+            {{ error }}
+        </div>
+    {% endfor %}
+{% endfor %}
+
+{% if form_display_mode_table %}
+    {% for field in form.hidden_fields %}
+        {{ field }}
+    {% endfor %}
+    <tr>
+    {% for field in form.visible_fields %}
+        <td title="{% if field.errors %}{% for error in field.errors %}{{ error }}{% if not forloop.last %} | {% endif %}{% endfor %}{% else %}{{ field.help_text }}{% endif %}">
+            {% if field.errors %}<div class="has-error">{% endif %}
+                {% if field|widget_type == 'radioselect' %}
+                    <div class="btn-group" data-toggle="buttons">
+                        {% for option in field %}
+                            <label class="btn btn-default {% if field.value == option.data.value %}active{% endif %}" for="{{ option.data.id }}">
+                                <input type="radio" name="{{ option.data.name }}" id="{{ option.data.id }}" value="{{ option.data.value }}" {% if field.value == option.data.value %}checked{% endif %}> {{ option.data.label }}
+                            </label>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    {% render_field field class+="form-control" %}
+                {% endif %}
+            {% if field.errors %}</div>{% endif %}
+        </td>
+    {% endfor %}
+    </tr>
+{% else %}
+    {% for field in form.hidden_fields %}
+        {{ field }}
+    {% endfor %}
+
+    {% for fieldset in form.get_fieldsets %}
+        {% if form.get_fieldsets|length > 1 %}
+            <fieldset class="appearance-fieldset">
+        {% endif %}
+            {% if form.get_fieldsets|length > 1 and fieldset.0 %}<legend class="appearance-legend">{{ fieldset.0 }}</legend>{% endif %}
+
+            {% with form|appearance_form_get_visile_fields_map as field_map %}
+                {% for field_name in fieldset.1.fields %}
+                    {% with field_map|dict_get:field_name as field %}
+                        {% include 'appearance/partials/form/field.html' %}
+                    {% endwith %}
+                {% endfor %}
+            {% endwith %}
+
+        {% if form.get_fieldsets|length > 1 %}
+            </fieldset>
+        {% endif %}
+    {% empty %}
+        {# Non fieldset form. Retain compatibility. #}
+        {% for field in form.visible_fields %}
+            {% include 'appearance/partials/form/field.html' %}
+        {% endfor %}
+    {% endfor %}
+{% endif %}
+
+<script>
+    {% for script in form|appearance_get_form_media_js %}
+        $.getScript('{{ script }}');
+    {% endfor %}
+</script>

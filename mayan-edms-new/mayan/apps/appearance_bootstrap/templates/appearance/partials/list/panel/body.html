@@ -1,0 +1,9 @@
+{% load navigation_tags %}
+
+<div class="panel-body">
+    {% if not hide_columns %}
+        {% for column in source_columns_non_identifier %}
+            <div class="text-center" style="">{% navigation_source_column_resolve column=column as column_value %}{% if column_value != '' %}{% if column.include_label %}<span class="source-column-label">{{ column.label }}</span>: {% endif %}{{ column_value }}{% endif %}</div>
+        {% endfor %}
+    {% endif %}
+</div>
